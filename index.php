@@ -1,56 +1,26 @@
-<?php session_start(); ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Lipa na M-Pesa</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #eaedf4; font-family: "Rubik", sans-serif; }
-    .card { width: 310px; border: none; border-radius: 15px; }
-    .justify-content-around div {
-      border: none; border-radius: 20px; background: #f3f4f6;
-      padding: 5px 20px; color: #8d9297;
-    }
-    .justify-content-around div:hover {
-      background: #545ebd; color: #fff; cursor: pointer;
-    }
-    .justify-content-around div:first-child {
-      background: #545ebd; color: #fff;
-    }
-    img { border-radius: 15px; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M-Pesa Payment</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" />
 </head>
-<body class="snippet-body">
-  <div class="container d-flex justify-content-center">
-    <div class="card mt-5 px-3 py-4">
-      <div class="d-flex flex-row justify-content-around">
-        <div class="mpesa"><span>Mpesa</span></div>
-        <div><span>Paypal</span></div>
-        <div><span>Card</span></div>
-      </div>
-      <div class="media mt-4 pl-2">
-        <img src="./images/1200px-M-PESA_LOGO-01.svg.png" class="mr-3" height="75"/>
-        <div class="media-body">
-          <h6 class="mt-1">Enter Amount & Number</h6>
+<body class="bg-light">
+  <div class="container mt-5">
+    <div class="card p-4">
+      <h3 class="mb-4">Lipa na M-Pesa</h3>
+      <form action="stk_initiate.php" method="POST">
+        <div class="mb-3">
+          <label class="form-label">Amount</label>
+          <input type="number" name="amount" class="form-control" required />
         </div>
-      </div>
-      <div class="media mt-3 pl-2">
-        <form class="row g-3" action="stk_initiate.php" method="POST">
-          <div class="col-12">
-            <label class="form-label">Amount</label>
-            <input type="text" class="form-control" name="amount" placeholder="Enter Amount" required>
-          </div>
-          <div class="col-12">
-            <label class="form-label">Phone Number</label>
-            <input type="text" class="form-control" name="phone" placeholder="2547XXXXXXXX" required>
-          </div>
-          <div class="col-12">
-            <button type="submit" class="btn btn-success" name="submit" value="submit">Donate</button>
-          </div>
-        </form>
-      </div>
+        <div class="mb-3">
+          <label class="form-label">Phone Number (2547XXXXXXXX)</label>
+          <input type="text" name="phone" class="form-control" required />
+        </div>
+        <button type="submit" name="submit" value="submit" class="btn btn-success">Pay</button>
+      </form>
     </div>
   </div>
 </body>
