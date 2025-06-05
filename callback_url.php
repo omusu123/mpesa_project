@@ -1,55 +1,58 @@
 <?php
-header("Content-Type: application/json");
+if (isset($_POST['submit'])) {
+  require 'db.php';
+  date_default_timezone_set('Africa/Nairobi');
 
-// Database connection (adjust with your credentials)
-$conn = new mysqli("localhost", "db_username", "db_password", "mpesa_db");
-if ($conn->connect_error) {
-    http_response_code(500);
-    echo json_encode(["ResultCode" => 1, "ResultDesc" => "DB connection failed"]);
-    exit;
+  $consumerKey = 'YourConsumerKey';
+  $consumerSecret = 'YourConsumerSecret';
+  $BusinessShortCode = '174379';
+  $Passkey = 'YourPasskey';
+
+  $PartyA = $_POST['phone'];
+  $AccountReference = 'Test123';
+  $TransactionDesc = 'M-Pesa Payment';
+  $Amount = $_POST['amount'];
+  $Timestamp = date('YmdHis');
+  $Password = base64_encode($BusinessShortCode . $Passkey . $Timestamp);
+
+  $headers = ['Content-Type:application/json; charset=utf8'];
+  $access_token_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+
+  $curl = curl_init($access_token_url);
+  curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+  curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
+  curl_setopt($curl, CURLOPT_USERPWD, $consumerKey . ':' . $consumerSecret);
+  $result = json_decode(curl_exec($curl));
+  $access_token = $result->access_token;
+  curl_close($curl);
+
+  $stkheader = ['Content-Type:application/json', 'Authorization:Bearer ' . $access_token];
+  $initiate_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
+  $CallBackURL = 'https://your-render-app.onrender.com/callback_url.php';
+
+  $curl_post_data = [
+    'BusinessShortCode' => $BusinessShortCode,
+    'Password' => $Password,
+    'Timestamp' => $Timestamp,
+    'TransactionType' => 'CustomerPayBillOnline',
+    'Amount' => $Amount,
+    'PartyA' => $PartyA,
+    'PartyB' => $BusinessShortCode,
+    'PhoneNumber' => $PartyA,
+    'CallBackURL' => $CallBackURL,
+    'AccountReference' => $AccountReference,
+    'TransactionDesc' => $TransactionDesc
+  ];
+
+  $curl = curl_init();
+  curl_setopt($curl, CURLOPT_URL, $initiate_url);
+  curl_setopt($curl, CURLOPT_HTTPHEADER, $stkheader);
+  curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($curl, CURLOPT_POST, true);
+  curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($curl_post_data));
+  $response = curl_exec($curl);
+  curl_close($curl);
+
+  header("Location: status.php?status=waiting");
+  exit();
 }
-
-$mpesaResponse = file_get_contents('php://input');
-$data = json_decode($mpesaResponse, true);
-
-// Log raw response (optional)
-file_put_contents("M_PESAConfirmationResponse.txt", $mpesaResponse . PHP_EOL, FILE_APPEND);
-
-if (isset($data['Body']['stkCallback'])) {
-    $callback = $data['Body']['stkCallback'];
-
-    $merchantRequestID = $callback['MerchantRequestID'] ?? '';
-    $checkoutRequestID = $callback['CheckoutRequestID'] ?? '';
-    $resultCode = $callback['ResultCode'] ?? -1;
-    $resultDesc = $callback['ResultDesc'] ?? '';
-
-    $receiptNumber = null;
-
-    if ($resultCode == 0) {
-        // Success: parse callback metadata for MpesaReceiptNumber
-        $callbackMetadata = $callback['CallbackMetadata']['Item'] ?? [];
-        foreach ($callbackMetadata as $item) {
-            if ($item['Name'] == 'MpesaReceiptNumber') {
-                $receiptNumber = $item['Value'];
-            }
-        }
-        $status = 'Success';
-    } else {
-        $status = 'Failed';
-    }
-
-    // Update database record with transaction result
-    $stmt = $conn->prepare("UPDATE mpesa_transactions SET result_code=?, result_desc=?, mpesa_receipt_number=?, status=? WHERE checkout_request_id=?");
-    $stmt->bind_param("issss", $resultCode, $resultDesc, $receiptNumber, $status, $checkoutRequestID);
-    $stmt->execute();
-    $stmt->close();
-}
-
-$conn->close();
-
-// Send response to Safaricom
-echo json_encode([
-    "ResultCode" => 0,
-    "ResultDesc" => "Confirmation Received Successfully"
-]);
-?>
