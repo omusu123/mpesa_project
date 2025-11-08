@@ -1,9 +1,10 @@
 services:
   - type: web
     name: mpesa-payment-app
-    env: php
-    buildCommand: echo "No build needed for PHP"
+    runtime: php
+    buildCommand: ""
     startCommand: php -S 0.0.0.0:$PORT
+    plan: free
     envVars:
       - key: PHP_VERSION
         value: 8.2
