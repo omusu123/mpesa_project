@@ -1,0 +1,32 @@
+# Environment files
+.env
+config.local.php
+*.local.php
+
+# Logs
+*.log
+M_PESAConfirmationResponse.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Test files (optional - remove if you want to commit test files)
+# test_*.php
+# diagnose_*.php
+# verify_*.php
+

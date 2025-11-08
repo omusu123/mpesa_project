@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: mpesa-payment-app
+    env: php
+    buildCommand: echo "No build needed for PHP"
+    startCommand: php -S 0.0.0.0:$PORT
+    envVars:
+      - key: PHP_VERSION
+        value: 8.2
+      # Database configuration (set these in Render dashboard)
+      - key: DB_HOST
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASS
+        sync: false
+      # M-Pesa credentials (set these in Render dashboard)
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_BUSINESS_SHORTCODE
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+

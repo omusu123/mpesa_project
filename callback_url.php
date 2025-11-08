@@ -1,58 +1,89 @@
 <?php
-if (isset($_POST['submit'])) {
-  require 'db.php';
-  date_default_timezone_set('Africa/Nairobi');
+/**
+ * M-Pesa Callback URL Handler
+ * This file receives callback data from M-Pesa after a transaction
+ */
 
-  $consumerKey = 'YourConsumerKey';
-  $consumerSecret = 'YourConsumerSecret';
-  $BusinessShortCode = '174379';
-  $Passkey = 'YourPasskey';
+require 'db.php';
+date_default_timezone_set('Africa/Nairobi');
 
-  $PartyA = $_POST['phone'];
-  $AccountReference = 'Test123';
-  $TransactionDesc = 'M-Pesa Payment';
-  $Amount = $_POST['amount'];
-  $Timestamp = date('YmdHis');
-  $Password = base64_encode($BusinessShortCode . $Passkey . $Timestamp);
+// Get the raw POST data
+$content = file_get_contents('php://input');
+$data = json_decode($content, true);
 
-  $headers = ['Content-Type:application/json; charset=utf8'];
-  $access_token_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+// Log the callback data for debugging
+$logFile = 'M_PESAConfirmationResponse.txt';
+file_put_contents($logFile, date('Y-m-d H:i:s') . "\n" . print_r($data, true) . "\n\n", FILE_APPEND);
 
-  $curl = curl_init($access_token_url);
-  curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-  curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
-  curl_setopt($curl, CURLOPT_USERPWD, $consumerKey . ':' . $consumerSecret);
-  $result = json_decode(curl_exec($curl));
-  $access_token = $result->access_token;
-  curl_close($curl);
+// Respond to M-Pesa immediately (required)
+header('Content-Type: application/json');
+$response = [
+    'ResultCode' => 0,
+    'ResultDesc' => 'Accept'
+];
+echo json_encode($response);
 
-  $stkheader = ['Content-Type:application/json', 'Authorization:Bearer ' . $access_token];
-  $initiate_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
-  $CallBackURL = 'https://your-render-app.onrender.com/callback_url.php';
-
-  $curl_post_data = [
-    'BusinessShortCode' => $BusinessShortCode,
-    'Password' => $Password,
-    'Timestamp' => $Timestamp,
-    'TransactionType' => 'CustomerPayBillOnline',
-    'Amount' => $Amount,
-    'PartyA' => $PartyA,
-    'PartyB' => $BusinessShortCode,
-    'PhoneNumber' => $PartyA,
-    'CallBackURL' => $CallBackURL,
-    'AccountReference' => $AccountReference,
-    'TransactionDesc' => $TransactionDesc
-  ];
-
-  $curl = curl_init();
-  curl_setopt($curl, CURLOPT_URL, $initiate_url);
-  curl_setopt($curl, CURLOPT_HTTPHEADER, $stkheader);
-  curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($curl, CURLOPT_POST, true);
-  curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($curl_post_data));
-  $response = curl_exec($curl);
-  curl_close($curl);
-
-  header("Location: status.php?status=waiting");
-  exit();
+// Process the callback data
+if (isset($data['Body']['stkCallback'])) {
+    $callback = $data['Body']['stkCallback'];
+    $merchantRequestID = $callback['MerchantRequestID'] ?? null;
+    $checkoutRequestID = $callback['CheckoutRequestID'] ?? null;
+    $resultCode = $callback['ResultCode'] ?? null;
+    $resultDesc = $callback['ResultDesc'] ?? '';
+    
+    // If transaction was successful
+    if ($resultCode == 0 && isset($callback['CallbackMetadata']['Item'])) {
+        $items = $callback['CallbackMetadata']['Item'];
+        $mpesaCode = '';
+        $phone = '';
+        $amount = 0;
+        
+        // Extract data from callback metadata
+        foreach ($items as $item) {
+            if ($item['Name'] == 'MpesaReceiptNumber') {
+                $mpesaCode = $item['Value'];
+            } elseif ($item['Name'] == 'PhoneNumber') {
+                $phone = $item['Value'];
+            } elseif ($item['Name'] == 'Amount') {
+                $amount = $item['Value'];
+            }
+        }
+        
+        // Insert successful transaction into database
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO payments (phone, amount, mpesa_code, result_code, result_desc, merchant_request_id, checkout_request_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $phone,
+                $amount,
+                $mpesaCode,
+                $resultCode,
+                $resultDesc,
+                $merchantRequestID,
+                $checkoutRequestID
+            ]);
+        } catch (PDOException $e) {
+            error_log("Database error: " . $e->getMessage());
+        }
+    } else {
+        // Transaction failed - still log it
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO payments (phone, amount, result_code, result_desc, merchant_request_id, checkout_request_id) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                '', // Phone not available in failed transactions
+                0,  // Amount not available in failed transactions
+                $resultCode,
+                $resultDesc,
+                $merchantRequestID,
+                $checkoutRequestID
+            ]);
+        } catch (PDOException $e) {
+            error_log("Database error: " . $e->getMessage());
+        }
+    }
 }
